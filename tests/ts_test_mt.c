@@ -30,8 +30,14 @@
 #endif
 
 #include "tslib.h"
-#include "fbutils.h"
 #include "testutils.h"
+
+#if USE_SDL2
+#define SDL_MAIN_HANDLED
+#include <SDL2/SDL.h>
+#else
+#include "fbutils.h"
+#endif
 
 static int palette[] =
 {
@@ -40,11 +46,18 @@ static int palette[] =
 #define NR_COLORS (int)(sizeof (palette) / sizeof (palette [0]))
 
 #define NR_BUTTONS 3
+#if USE_SDL2
+#else
 static struct ts_button buttons[NR_BUTTONS];
+#endif
 
 static void sig(int sig)
 {
+#if USE_SDL2
+	SDL_Quit();
+#else
 	close_framebuffer();
+#endif
 	fflush(stderr);
 	printf("signal %d caught\n", sig);
 	fflush(stdout);
@@ -53,6 +66,8 @@ static void sig(int sig)
 
 static void refresh_screen()
 {
+#if USE_SDL2
+#else
 	int i;
 
 	fillrect (0, 0, xres - 1, yres - 1, 0);
@@ -61,6 +76,7 @@ static void refresh_screen()
 
 	for (i = 0; i < NR_BUTTONS; i++)
 		button_draw (&buttons [i]);
+#endif
 }
 
 static void help()
@@ -81,6 +97,13 @@ int main(int argc, char **argv)
 	unsigned short max_slots = 1;
 	struct ts_sample_mt **samp_mt = NULL;
 	short verbose = 0;
+#if USE_SDL2
+	SDL_Window *window;
+	SDL_Renderer *renderer;
+	SDL_Surface *surface;
+	SDL_Texture *texture;
+	SDL_Event event;
+#endif
 
 	const char *tsdevice = NULL;
 
@@ -155,6 +178,34 @@ int main(int argc, char **argv)
 		return -ENOMEM;
 	}
 
+#if USE_SDL2
+	printf("starting SDL Video\n");
+	SDL_SetMainReady();
+	if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+		SDL_Log("Unable to initialize SDL: %s\n", SDL_GetError());
+		free(samp_mt[0]);
+		free(samp_mt);
+		ts_close(ts);
+		return 1;
+	}
+
+	if (SDL_CreateWindowAndRenderer(640, 480, SDL_WINDOW_SHOWN, &window, &renderer)) {
+		SDL_Log("Unable to create window and renderer: %s\n", SDL_GetError());
+		goto out;
+	}
+
+	if (SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP)) {
+		SDL_Log("Unable to set fullscreen: %s\n", SDL_GetError());
+		goto out;
+	}
+
+	surface = SDL_LoadBMP("sample.bmp");
+	if (!surface) {
+		SDL_Log("Unable to load BMP: %s\n", SDL_GetError());
+		goto out;
+	}
+
+#else
 	if (open_framebuffer()) {
 		close_framebuffer();
 		free(samp_mt[0]);
@@ -162,6 +213,7 @@ int main(int argc, char **argv)
 		ts_close(ts);
 		exit(1);
 	}
+#endif
 
 	x = calloc(max_slots, sizeof(int));
 	if (!x)
@@ -176,14 +228,22 @@ int main(int argc, char **argv)
 		goto out;
 
 	for (i = 0; i < max_slots; i++) {
+	#if USE_SDL2
+	#else
 		x[i] = xres/2;
 		y[i] = yres/2;
+	#endif
 	}
 
+#if USE_SDL2
+#else
 	for (i = 0; i < NR_COLORS; i++)
 		setcolor (i, palette [i]);
+#endif
 
 	/* Initialize buttons */
+#if USE_SDL2
+#else
 	memset (&buttons, 0, sizeof (buttons));
 	buttons [0].w = buttons [1].w = buttons [2].w = xres / 4;
 	buttons [0].h = buttons [1].h = buttons [2].h = 20;
@@ -194,6 +254,7 @@ int main(int argc, char **argv)
 	buttons [0].text = "Drag";
 	buttons [1].text = "Draw";
 	buttons [2].text = "Quit";
+#endif
 
 	refresh_screen ();
 
@@ -207,11 +268,18 @@ int main(int argc, char **argv)
 				if (j > 0 && (mode_mt[j] & 0x00000008))
 					continue;
 
+			#if USE_SDL2
+			#else
 				put_cross(x[j], y[j], 2 | XORMODE);
+			#endif
 			}
 		}
 
 		ret = ts_read_mt(ts, samp_mt, max_slots, 1);
+	#if USE_SDL2
+	#else
+		SDL_DestroyWindow(window);
+	#endif
 
 		/* Hide it */
 		for (j = 0; j < max_slots; j++) {
@@ -219,13 +287,20 @@ int main(int argc, char **argv)
 				if (j > 0 && (mode_mt[j] & 0x00000008))
 					continue;
 
+			#if USE_SDL2
+			#else
 				put_cross(x[j], y[j], 2 | XORMODE);
+			#endif
 			}
 		}
 
 		if (ret < 0) {
 			perror("ts_read");
+		#if USE_SDL2
+			SDL_Quit();
+		#else
 			close_framebuffer();
+		#endif
 			free(samp_mt);
 			ts_close(ts);
 			exit(1);
@@ -239,10 +314,13 @@ int main(int argc, char **argv)
 				continue;
 
 			for (i = 0; i < NR_BUTTONS; i++) {
+			#if USE_SDL2
+			#else
 				if (button_handle(&buttons[i],
 						  samp_mt[0][j].x,
 						  samp_mt[0][j].y,
 						  samp_mt[0][j].pressure)) {
+			#endif
 					switch (i) {
 					case 0:
 						mode = 0;
@@ -255,7 +333,10 @@ int main(int argc, char **argv)
 					case 2:
 						quit_pressed = 1;
 					}
+			#if USE_SDL2
+			#else
 				}
+			#endif
 			}
 
 			if (verbose) {
@@ -270,8 +351,12 @@ int main(int argc, char **argv)
 
 			if (samp_mt[0][j].pressure > 0) {
 				if (mode == 0x80000001) { /* draw mode while drawing */
-					if (mode_mt[j] == 0x80000000) /* slot while drawing */
+					if (mode_mt[j] == 0x80000000) { /* slot while drawing */
+					#if USE_SDL2
+					#else
 						line (x[j], y[j], samp_mt[0][j].x, samp_mt[0][j].y, 2);
+					#endif
+					}
 				}
 				x[j] = samp_mt[0][j].x;
 				y[j] = samp_mt[0][j].y;
@@ -289,7 +374,11 @@ int main(int argc, char **argv)
 	}
 
 out:
+#if USE_SDL2
+	SDL_Quit();
+#else
 	close_framebuffer();
+#endif
 
 	if (ts)
 		ts_close(ts);

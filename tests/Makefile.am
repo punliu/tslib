@@ -23,6 +23,8 @@ endif
 
 ts_test_mt_SOURCES	= ts_test_mt.c testutils.c testutils.h fbutils.h font_8x8.c font_8x16.c font.h
 ts_test_mt_LDADD	= $(top_builddir)/src/libts.la
+ts_test_mt_LDFLAGS	= $(SDL2_LIBS)
+ts_test_mt_CFLAGS	= $(SDL2_CFLAGS)
 if FREEBSD
 ts_test_mt_SOURCES	+= fbutils-bsd.c
 else

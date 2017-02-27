@@ -98,13 +98,16 @@ int main(int argc, char **argv)
 	struct ts_sample_mt **samp_mt = NULL;
 	short verbose = 0;
 #if USE_SDL2
-	SDL_Window *window;
-	SDL_Renderer *renderer;
-	SDL_Surface *surface;
-	SDL_Texture *texture;
+	SDL_Window *window = NULL;
+	SDL_Renderer *renderer = NULL;
+	SDL_Texture *texture = NULL;
 	SDL_Event event;
+	int nr_displays = 0;
+	SDL_Rect r;
+	uint32_t *pixels = NULL;
 #endif
-
+	int touch_max_x = 0;
+	int touch_max_y = 0;
 	const char *tsdevice = NULL;
 
 	signal(SIGSEGV, sig);
@@ -179,6 +182,11 @@ int main(int argc, char **argv)
 	}
 
 #if USE_SDL2
+
+	/* TODO get maximum of ABS_MT_POSITION_ from ioctl */
+	touch_max_x = 2964;
+	touch_max_y = 1716;
+
 	printf("starting SDL Video\n");
 	SDL_SetMainReady();
 	if (SDL_Init(SDL_INIT_VIDEO) < 0) {
@@ -189,8 +197,50 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	if (SDL_CreateWindowAndRenderer(640, 480, SDL_WINDOW_SHOWN, &window, &renderer)) {
-		SDL_Log("Unable to create window and renderer: %s\n", SDL_GetError());
+	nr_displays = SDL_GetNumVideoDisplays();
+	if (nr_displays < 0) {
+		SDL_Log("Unable to read number of displays: %s\n", SDL_GetError());
+		goto out;
+	} else if (nr_displays == 0) {
+		printf("ts_test_mt: no displays found\n");
+		goto out;
+	} else {
+		printf("ts_test_mt: %d displays found\n", nr_displays);
+	}
+
+	for (i = 0; i < nr_displays; i++) {
+		if (SDL_GetDisplayBounds(i, &r) != 0) {
+			SDL_Log("SDL_GetDisplayBounds failed: %s", SDL_GetError());
+			goto out;
+		}
+		printf("display %d: %dx%d\n", i, r.w, r.h);
+	}
+	if (nr_displays > 1) {
+		printf("there is more than one display. I don't know which one to use.\n");
+		goto out;
+	}
+
+	window = SDL_CreateWindow("tslib multitouch test program",
+				  SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+				  r.w, r.h,
+				  0);
+	if (!window) {
+		SDL_Log("Unable to create window: %s\n", SDL_GetError());
+		goto out;
+	}
+
+	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
+	if (!renderer) {
+		SDL_Log("Unable to create renderer: %s\n", SDL_GetError());
+		goto out;
+	}
+
+	texture = SDL_CreateTexture(renderer,
+				    SDL_PIXELFORMAT_ARGB8888,
+				    SDL_TEXTUREACCESS_STATIC,
+				    r.w, r.h);
+	if (!texture) {
+		SDL_Log("Unable to create texture: %s\n", SDL_GetError());
 		goto out;
 	}
 
@@ -199,11 +249,14 @@ int main(int argc, char **argv)
 		goto out;
 	}
 
-	surface = SDL_LoadBMP("sample.bmp");
-	if (!surface) {
-		SDL_Log("Unable to load BMP: %s\n", SDL_GetError());
+	pixels = malloc(sizeof(uint32_t) * (r.w > touch_max_x ? r.w : touch_max_x) *
+					   (r.h > touch_max_y ? r.h : touch_max_y));
+	if (!pixels) {
+		printf("error allocating pixels\n");
 		goto out;
 	}
+
+	memset(pixels, 255, r.w * r.h * sizeof(uint32_t)); 
 
 #else
 	if (open_framebuffer()) {
@@ -261,6 +314,21 @@ int main(int argc, char **argv)
 	while (1) {
 		int ret;
 
+	#if USE_SDL2
+		SDL_Event sdl_event;
+
+		SDL_PollEvent(&sdl_event);
+		if (event.type == SDL_QUIT) {
+			printf("SDL_QUIT event\n");
+			quit_pressed = 1;
+		}
+
+		SDL_UpdateTexture(texture, NULL, pixels, r.w * sizeof(Uint32));
+
+		mode = 1;
+	#else
+	#endif
+
 		/* Show the cross */
 		for (j = 0; j < max_slots; j++) {
 			if ((mode & 15) != 1) { /* not in draw mode */
@@ -276,10 +344,20 @@ int main(int argc, char **argv)
 		}
 
 		ret = ts_read_mt(ts, samp_mt, max_slots, 1);
-	#if USE_SDL2
-	#else
-		SDL_DestroyWindow(window);
-	#endif
+		if (ret < 0) {
+			perror("ts_read");
+		#if USE_SDL2
+			SDL_DestroyTexture(texture);
+			SDL_DestroyRenderer(renderer);
+			SDL_DestroyWindow(window);
+			SDL_Quit();
+		#else
+			close_framebuffer();
+		#endif
+			free(samp_mt);
+			ts_close(ts);
+			exit(1);
+		}
 
 		/* Hide it */
 		for (j = 0; j < max_slots; j++) {
@@ -294,18 +372,6 @@ int main(int argc, char **argv)
 			}
 		}
 
-		if (ret < 0) {
-			perror("ts_read");
-		#if USE_SDL2
-			SDL_Quit();
-		#else
-			close_framebuffer();
-		#endif
-			free(samp_mt);
-			ts_close(ts);
-			exit(1);
-		}
-
 		if (ret != 1)
 			continue;
 
@@ -313,14 +379,13 @@ int main(int argc, char **argv)
 			if (samp_mt[0][j].valid != 1)
 				continue;
 
-			for (i = 0; i < NR_BUTTONS; i++) {
 			#if USE_SDL2
 			#else
+			for (i = 0; i < NR_BUTTONS; i++) {
 				if (button_handle(&buttons[i],
 						  samp_mt[0][j].x,
 						  samp_mt[0][j].y,
 						  samp_mt[0][j].pressure)) {
-			#endif
 					switch (i) {
 					case 0:
 						mode = 0;
@@ -333,11 +398,9 @@ int main(int argc, char **argv)
 					case 2:
 						quit_pressed = 1;
 					}
-			#if USE_SDL2
-			#else
 				}
-			#endif
 			}
+			#endif
 
 			if (verbose) {
 				printf(YELLOW "%ld.%06ld:" RESET " (slot %d) %6d %6d %6d\n",
@@ -353,6 +416,7 @@ int main(int argc, char **argv)
 				if (mode == 0x80000001) { /* draw mode while drawing */
 					if (mode_mt[j] == 0x80000000) { /* slot while drawing */
 					#if USE_SDL2
+						pixels[samp_mt[0][j].y * r.w + samp_mt[0][j].x] = 0;
 					#else
 						line (x[j], y[j], samp_mt[0][j].x, samp_mt[0][j].y, 2);
 					#endif
@@ -368,13 +432,28 @@ int main(int argc, char **argv)
 				mode_mt[j] &= ~0x80000000;
 				mode_mt[j] |= 0x00000008; /* hide the cross */
 			}
-			if (quit_pressed)
+
+			if (quit_pressed) {
+				printf("ts_test_mt: quit\n");
 				goto out;
+			}
 		}
+
+#if USE_SDL2
+		SDL_RenderClear(renderer);
+		SDL_RenderCopy(renderer, texture, NULL, NULL);
+		SDL_RenderPresent(renderer);
+#endif
 	}
 
 out:
 #if USE_SDL2
+	if (pixels)
+		free(pixels);
+
+	SDL_DestroyTexture(texture);
+	SDL_DestroyRenderer(renderer);
+	SDL_DestroyWindow(window);
 	SDL_Quit();
 #else
 	close_framebuffer();

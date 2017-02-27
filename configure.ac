@@ -55,11 +55,6 @@ PKG_CHECK_MODULES([SDL2], [sdl2 >= 2.0.0], [HAVE_SDL2="yes"], [HAVE_SDL2="no"])
 if test "$HAVE_SDL2" = "no"; then
 	enable_sdl2="no"
 fi
-AC_PATH_PROG(SDL_CONFIG, sdl2-config)
-if test -n "$SDL_CONFIG"; then
-	LIBS="$LIBS `$SDL_CONFIG --libs`"
-	CFLAGS="$CFLAGS `$SDL_CONFIG --cflags`"
-fi
 AS_IF([test "$enable_sdl2" = "yes"], [AC_DEFINE([USE_SDL2], [1], [Define if using libsdl2.])])
 
 # Checks for header files.

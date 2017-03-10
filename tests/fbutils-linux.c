@@ -16,16 +16,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/fcntl.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/time.h>
-
-#ifdef __ANDROID__
 #include <fcntl.h>
-#else
-#include <sys/fcntl.h>
-#endif
 
 #include <linux/vt.h>
 #include <linux/kd.h>
@@ -153,7 +147,7 @@ int open_framebuffer(void)
 	bytes_per_pixel = (var.bits_per_pixel + 7) / 8;
 	transp_mask = ((1 << var.transp.length) - 1) <<
 		var.transp.offset; /* transp.length unlikely > 32 */
-	line_addr = malloc (sizeof (line_addr) * var.yres_virtual);
+	line_addr = malloc (sizeof (*line_addr) * var.yres_virtual);
 	addr = 0;
 	for (y = 0; y < var.yres_virtual; y++, addr += fix.line_length)
 		line_addr [y] = fbuffer + addr;

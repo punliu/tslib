@@ -1,17 +1,34 @@
+## tslib 1.7
+
+Changes since last release:
+* added a release helper script to simplify the releasing process
+* add proper AUTHORS and THANKS files, as well as .mailmap
+* bugfixes
+  - 6ea643e ts_test_mt: fix idev commandline option
+  - 9617c7d dmc-raw: fix errno return code to be negative
+
+
 ## tslib 1.6
 
-Changes since 1.5 are:
+Changes since the last release:
+* ABI addition: libts.so.0 (ensuring backwards compatibility)
+* tools/ts_uinput_start.sh that creates /dev/input/ts_uinput
+* improved documentation in README
 * support for FreeBSD (experimental)
 * bugfixes and performance improvements
+  - 3b01897 skip: fix order of memory freeing in finish routine
+  - 9ed4eca skip: avoid unnecessary malloc during operation
+  - f9202cc median: fix memory cleanup
+  - 69444b9 input-raw: improve input definitions backwards compatibility
 
 
 ## tslib 1.5
 
 Changes since 1.4 are:
-* fix ts_calibrate regression (creating the calibration file)
 * restore full backwards compatibility for all old kernel headers
 * 64 bit compatibility for test programs
 * bugfixes
+  - 3f99a83 Revert "plugins: linear: fix config file access"
 
 
 ## tslib 1.4

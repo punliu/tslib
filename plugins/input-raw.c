@@ -417,7 +417,15 @@ static int ts_input_read_mt(struct tslib_module_info *inf,
 	int j, k;
 	int pen_up = 0;
 
-	if (i->buf == NULL) {
+	if (i->buf == NULL || i->max_slots < max_slots || i->nr < nr) {
+		if (i->buf) {
+			for (j = 0; j < i->nr; j++) {
+				if (i->buf[j])
+					free(i->buf[j]);
+			}
+			free(i->buf);
+		}
+
 		i->buf = malloc(nr * sizeof(struct ts_sample_mt *));
 		if (!i->buf)
 			return -ENOMEM;
@@ -456,8 +464,13 @@ static int ts_input_read_mt(struct tslib_module_info *inf,
 			rd = read(ts->fd,
 				  i->ev,
 				  sizeof(struct input_event) * NUM_EVENTS_READ);
-			if (rd < (int) sizeof(struct input_event)) {
-				perror("tslib: error reading input event");
+			if (rd == -1) {
+				if (errno > 0)
+					total = errno * -1;
+				else
+					total = errno;
+				break;
+			} else if (rd < (int) sizeof(struct input_event)) {
 				total = -1;
 				break;
 			}
@@ -615,12 +628,13 @@ static int ts_input_read_mt(struct tslib_module_info *inf,
 						break;
 					case ABS_MT_SLOT:
 						if (i->ev[it].value < 0 || i->ev[it].value >= max_slots) {
-							fprintf(stderr, "tslib: slot out of range\n");
-							return -EINVAL;
+							fprintf(stderr, "tslib: warning: slot out of range. data corrupted!\n");
+							i->slot = max_slots - 1;
+						} else {
+							i->slot = i->ev[it].value;
+							i->buf[total][i->slot].slot = i->ev[it].value;
+							i->buf[total][i->slot].valid = 1;
 						}
-						i->slot = i->ev[it].value;
-						i->buf[total][i->slot].slot = i->ev[it].value;
-						i->buf[total][i->slot].valid = 1;
 						break;
 					}
 					break;

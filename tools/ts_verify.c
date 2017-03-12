@@ -1,11 +1,7 @@
 /*
- * (C) 2017 Ginzinger electronic systems GmbH, A-4952 Weng im Innkreis
+ * ts_verify should test tslib's API
  *
- * Martin Kepplinger <martin.kepplinger@ginzinger.com>  2016-09-14
- * Melchior FRANZ <melchior.franz@ginzinger.com>  2015-09-30
- *
- * ts_uinput daemon to generate (single- and multitouch) input events
- * taken from tslib multitouch samples.
+ * Copyright (C) 2017 - Martin Kepplinger <martink@posteo.de>
  */
 
 #include <fcntl.h>
@@ -31,7 +27,7 @@
 #define LONG(x) ((x)/BITS_PER_LONG)
 #define test_bit(bit, array)	((array[LONG(bit)] >> OFF(bit)) & 1)
 
-#define DEFAULT_UINPUT_NAME "ts_uinput"
+#define DEFAULT_UINPUT_NAME "ts_verify"
 
 #ifndef UI_GET_VERSION
 #define UI_GET_VERSION		_IOR(UINPUT_IOCTL_BASE, 301, unsigned int)
@@ -59,18 +55,13 @@ struct data_t {
 
 static void help(struct data_t *data)
 {
-	printf("Starts tslib instance listening to given event <device>, creates a virtual\n");
-	printf("input event device with given <name> using 'uinput', then continually reads\n");
-	printf("touch reports from tslib and replays them as touch events of protocol type B\n");
-	printf("on the virtual device.\n");
+	printf("This verifies tslib's API\n");
 	printf("\n");
-	printf("Usage: ts_uinput [-v] [-d] [-i <device>] [-f <device>] [-n <name>] [-s <slots>]\n");
+	printf("Usage: ts_verify [-v] [-i <device>] [-f <device>] [-s <slots>]\n");
 	printf("\n");
 	printf("  -h, --help          this help text\n");
-	printf("  -d, --daemonize     run in the background as a daemon\n");
 	printf("  -v, --verbose       verbose output\n");
-	printf("  -n, --name          set name of new input device  (default: " DEFAULT_UINPUT_NAME")\n");
-	printf("  -i, --idev          touchscreen's input device\n");
+	printf("  -i, --idev          interactive mode. use your own input device instead of a virtual one.\n");
 	printf("  -f, --fbdev         touchscreen's framebuffer device\n");
 	printf("  -s, --slots         override available concurrent touch contacts\n");
 	if (data->uinput_version > 3) {
@@ -86,6 +77,7 @@ static int send_touch_events(struct data_t *data, struct ts_sample_mt **s,
 			      data->mt_type_a);
 }
 
+/* TODO make up one random device ourselft for the beginning */
 static int setup_uinput(struct data_t *data, int *max_slots)
 {
 	struct uinput_user_dev uidev;
@@ -297,14 +289,11 @@ int main(int argc, char **argv)
 		.mt_type_a = 0,
 	};
 	int i, j;
-	unsigned short run_daemon = 0;
 
 	while (1) {
 		const struct option long_options[] = {
 			{ "help",         no_argument,       0, 'h' },
-			{ "name",         required_argument, 0, 'n' },
 			{ "verbose",      no_argument,       0, 'v' },
-			{ "daemonize",    no_argument,       0, 'd' },
 			{ "idev",         required_argument, 0, 'i' },
 			{ "fbdev",        required_argument, 0, 'f' },
 			{ "slots",        required_argument, 0, 's' },
@@ -323,16 +312,8 @@ int main(int argc, char **argv)
 			help(&data);
 			return 0;
 
-		case 'n':
-			data.uinput_name = optarg;
-			break;
-
 		case 'v':
 			data.verbose = 1;
-			break;
-
-		case 'd':
-			run_daemon = 1;
 			break;
 
 		case 'i':
@@ -494,26 +475,6 @@ int main(int argc, char **argv)
 				free(data.s_array[j]);
 			goto out;
 		}
-	}
-
-	if (run_daemon) {
-		if (data.uinput_version > 3) {
-			char name[64];
-			int ret = ioctl(data.fd_uinput,
-					UI_GET_SYSNAME(sizeof(name)),
-					name);
-			if (ret >= 0) {
-				fprintf(stdout, "%s\n", name);
-				fflush(stdout);
-			} else {
-				perror("ioctl UI_GET_SYSNAME");
-			}
-		} else {
-			fprintf(stderr, DEFAULT_UINPUT_NAME
-			": See the kernel log for the device number\n");
-		}
-		if (daemon(0, 0) == -1)
-			perror("error starting daemon");
 	}
 
 	while (1) {

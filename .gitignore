@@ -35,6 +35,7 @@ tests/ts_print_raw
 tests/ts_print_raw_mt
 tests/ts_test
 tools/ts_uinput
+tools/ts_verify
 tests/ts_finddev
 tests/ts_test_mt
 compile

@@ -166,6 +166,7 @@ static int skip_read_mt(struct tslib_module_info *info,
 					if (skip->buf_mt[i])
 						free(skip->buf_mt[i]);
 				}
+				free(skip->buf_mt);
 			}
 
 			skip->buf_mt = malloc(skip->ntail *
@@ -264,7 +265,7 @@ static int skip_read_mt(struct tslib_module_info *info,
 #ifdef DEBUG
 		for (i = 0; i < max_slots; i++) {
 			if (skip->buf_mt[skip->M][i].valid == 1) {
-				fprintf(stderr, "SKIP: -> (Slot %d: X:%d Y:%d) btn_touch:%d\n",
+				fprintf(stderr, "SKIP: (Slot %d) X:%4d Y:%4d btn_touch:%d\n",
 					skip->buf_mt[skip->M][i].slot,
 					skip->buf_mt[skip->M][i].x,
 					skip->buf_mt[skip->M][i].y,
@@ -301,13 +302,15 @@ static int skip_fini(struct tslib_module_info *info)
 	if (skip->buf)
 		free(skip->buf);
 
-	for (i = 0; i < skip->ntail; i++) {
-		if (skip->buf_mt[i])
-			free(skip->buf_mt[i]);
+	if (skip->buf_mt) {
+		for (i = 0; i < skip->ntail; i++) {
+			if (skip->buf_mt[i])
+				free(skip->buf_mt[i]);
+		}
+		free(skip->buf_mt);
 	}
 
 	if (skip->buf_mt)
-		free(skip->buf_mt);
 
 	if (skip->cur_mt && skip->cur_mt[0])
 		free(skip->cur_mt[0]);

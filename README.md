@@ -5,18 +5,23 @@
 
 [![Coverity Scan Build Status](https://scan.coverity.com/projects/11027/badge.svg)](https://scan.coverity.com/projects/tslib)
 
-tslib consists of the library _libts_ and tools that help you _calibrate_ and _use it_ in your environment. There's a [short introductory presentation from 2017](https://fosdem.org/2017/schedule/event/tslib/).
+tslib consists of the library _libts_ and tools that help you _calibrate_ and
+_use it_ in your environment. There's a [short introductory presentation from 2017](https://fosdem.org/2017/schedule/event/tslib/).
 
 ## table of contents
 * [setup and configure tslib](#setup-and-configure-tslib)
 * [filter modules](#filter-modules)
-* [libts - the library](#libts---the-library)
-* [tslib development](#tslib-development)
+* [the libts library](#the-libts-library)
+* [building tslib](#building-tslib)
 
 
 ## setup and configure tslib
 ### install tslib
-tslib should be usable on various operating systems, including GNU/Linux, Freebsd or Android Linux. Apart from building the latest tarball release by `./configure`, `make` and `make install`, tslib is available from the following distributors and their package management:
+tslib should be usable on various operating systems, including GNU/Linux,
+Freebsd or Android/Linux. See [building tslib](#building-tslib) for details.
+Apart from building the latest tarball release, running
+`./configure`, `make` and `make install`, tslib is available from the following
+distributors and their package management:
 * [Arch Linux](https://www.archlinux.org) and [Arch Linux ARM](https://archlinuxarm.org) - `pacman -S tslib`
 * [Buildroot](https://buildroot.org/) - `BR2_PACKAGE_TSLIB=y`
 * (Debian: [Looking for a sponsor](https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=854693) to include it)
@@ -45,7 +50,10 @@ tslib should be usable on various operating systems, including GNU/Linux, Freebs
 * If you are not using `/dev/fb0`, be sure to set `TSLIB_FBDEVICE`
 
 ### configure tslib
-This is just an example `/etc/ts.conf` file. Touch samples flow from top to bottom. Each line specifies one module and it's parameters. Modules are processed in order. Use _one_ module_raw that accesses your device, followed by any combination of filter modules.
+This is just an example `/etc/ts.conf` file. Touch samples flow from top to
+bottom. Each line specifies one module and it's parameters. Modules are
+processed in order. Use _one_ module_raw that accesses your device, followed
+by any combination of filter modules.
 
     module_raw input
     module median depth=3
@@ -61,25 +69,34 @@ through the library:
                module       module      module       module
 
 ### calibrate the touch screen
-Calibration is done by the `linear` plugin, which uses it's own config file `/etc/pointercal`. Don't edit this file manually. It is created by the `ts_calibrate` program:
+Calibration is done by the `linear` plugin, which uses it's own config file
+`/etc/pointercal`. Don't edit this file manually. It is created by the
+`ts_calibrate` program:
 
     # ts_calibrate
 
-The calibration procedure simply requires you to touch the cross on screen, where is appears, as accurate as possible.
+The calibration procedure simply requires you to touch the cross on screen,
+where is appears, as accurate as possible.
 
 ### test the filtered input behaviour
-You may quickly test the touch behaviour that results from the configured filters, using `ts_test_mt`:
+You may quickly test the touch behaviour that results from the configured
+filters, using `ts_test_mt`:
 
     # ts_test_mt
 
 ### use the filtered result in your system
-One way to provide your resulting input behaviour to your system, is to use tslib's userspace input driver `ts_uinput`:
+One way to provide your resulting input behaviour to your system, is to use
+tslib's userspace input driver `ts_uinput`:
 
     # ts_uinput -d
 
-`-d` make the program return and run as a daemon in the background. Inside of `/dev/input/` there now is a new input event device, which provides your configured input. You can even use a script like `tools/ts_uinput_start.sh` to start the ts_uinput daemon and create a defined `/dev/input/ts_uinput` symlink.
+`-d` makes the program return and run as a daemon in the background. Inside of
+`/dev/input/` there now is a new input event device, which provides your
+configured input. You can even use a script like `tools/ts_uinput_start.sh` to
+start the ts_uinput daemon and create a defined `/dev/input/ts_uinput` symlink.
 
-Remember to set your environment and configuration for ts_uinput, just like you did for ts_calibrate or ts_test_mt.
+Remember to set your environment and configuration for ts_uinput, just like you
+did for ts_calibrate or ts_test_mt.
 
 Let's recap the data flow here:
 
@@ -226,9 +243,10 @@ Parameters:
 ***
 
 
-## libts - the library
+## the libts library
 ### the libts API
-Check out the [tests](https://github.com/kergoth/tslib/tree/master/tests) directory for examples how to use it.
+Check out the [tests](https://github.com/kergoth/tslib/tree/master/tests)
+directory for examples how to use it.
 
 `ts_open()`  
 `ts_config()`  
@@ -243,23 +261,37 @@ Check out the [tests](https://github.com/kergoth/tslib/tree/master/tests) direct
 `ts_read_mt()`  
 `ts_reat_raw_mt()`  
 
-The API is documented in [our man pages](https://github.com/kergoth/tslib/tree/master/doc). Possibly there will be distributors who provide them online, like [Debian had done for tslib-1.0](https://manpages.debian.org/wheezy/libts-bin/index.html). As soon as there are up-to-date html pages hosted somewhere, we'll link the functions above to it.
+The API is documented in [our man pages](https://github.com/kergoth/tslib/tree/master/doc).
+Possibly there will be distributors who provide them online, like
+[Debian had done for tslib-1.0](https://manpages.debian.org/wheezy/libts-bin/index.html).
+As soon as there are up-to-date html pages hosted somewhere, we'll link the
+functions above to it.
 
 ### ABI - Application Binary Interface
 
-[Wikipedia](https://en.wikipedia.org/wiki/Application_binary_interface) has background information.
+[Wikipedia](https://en.wikipedia.org/wiki/Application_binary_interface) has
+background information.
 
 #### Soname versions
-Usually, and every time until now, libts does not break the ABI and your application can continue using libts after upgrading. Specifically this is indicated by the libts library version's major number, which should always stay 0. According to our versioning scheme, the major number is incremented only if we break backwards compatibility. The second or third minor version will increase with releases. In the following example
+Usually, and every time until now, libts does not break the ABI and your
+application can continue using libts after upgrading. Specifically this is
+indicated by the libts library version's major number, which should always stay
+the same. According to our versioning scheme, the major number is incremented
+only if we break backwards compatibility. The second or third minor version will
+increase with releases. In the following example
+
 
     libts.so -> libts.so.0.3.1
     libts.so.0 -> libts.so.0.3.1
     libts.so.0.3.1
 
-use `libts.so` for using tslib unconditionally and `libts.so.0` to make sure your current application never breaks.
+
+use `libts.so` for using tslib unconditionally and `libts.so.0` to make sure
+your current application never breaks.
 
 #### tslib package version
-Officially, a tslib tarball version number doesn't tell you anything about it's backwards compatibility.
+Officially, a tslib tarball version number doesn't tell you anything about it's
+backwards compatibility.
 
 ### dependencies
 
@@ -397,53 +429,49 @@ and call `ts_read_mt()` like so
 
 ***
 
-## tslib development
-### how to contribute
-Ideally you fork the project on github, make your changes and create a pull request. You can, however, send your patch to the current maintainer, [Martin Kepplinger](mailto:martink@posteo.de) too. We don't have a mailing list at the moment. Before you send changes, it would be awesome if you checked the following:
-* update the NEWS file's changelog if you added a feature
-* update or add man pages if applicable
-* update the README if applicable
-* add a line containing `Fixes #XX` in your git commit message; XX being the github issue's number if you fix an issue
-* update the wiki
+## building tslib
 
-### module development notes
-For those creating tslib modules, it is important to note a couple things with regard to handling of the ability for a user to request more than one ts event at a time. The first thing to note is that the lower layers may send up less events than the user requested, because some events may be filtered out by intermediate layers. Next, your module should send up just as many events as the user requested in nr. If your module is one that consumes events, such as variance, then you loop on the read from the lower layers, and only send the events up when
+tslib is primarily developed for Linux. However you should be able to run
+`./configure && make` on a large variety of operating systems.
+You won't (yet) get the same experience for all systems though:
 
-1. you have the number of events requested by the user, or
-2. one of the events from the lower layers was a pen release.
+#### libts and filter plugins (`module`s)
 
-### coding style
-We loosely tie to the [Linux coding style](https://www.kernel.org/doc/html/latest/process/coding-style.html)
+This is the hardware independent core part: _libts and all filter modules_ as
+_shared libraries_, build on the following operating systems.
 
-### release procedure
-A release can be done when either
-* an issue tagged as "improvement" is implemented, or
-* the previous release contains a user visible regression
+* **GNU / Linux**
+* **Android / Linux**
+* **FreeBSD**
+* **Haiku**
+* **Windows**
+* Mac OS X (?)
+* Hurd (?)
 
-The procedure looks like this:
+#### input plugins (`module_raw`)
 
-1. run coverity (or any static analysis) and fix new discovered issues
-* be sure to have a stable build system and your private gpg key set up
-* update the NEWS file with the changelog and bugfixes
-* update the THANKS file
-* update configure.ac libts library versions
-  * `AC_INIT` - includes the tslib package version X.X. generally we increment the minor version
-  * `LT_CURRENT` - increment **only if there are API changes** (additions / removals / changes)
-  * `LT_REVISION` - increment if anything changed. but if `LT_CURRENT` was incremented, set to 0!
-  * `LT_AGE` - increment **only if `LT_CURRENT` was incremented** and these **API changes are backwards compatible** (should always be the case, so it should match `LT_CURRENT`)
+This makes the thing usable in the read world because it accesses your device.
+See the [configure.ac](https://github.com/kergoth/tslib/blob/master/configure.ac)
+file for the currently possible configuration for your platform.
 
-6. create a new release/X.X branch remotely and switch to it locally
-* `./release -s -v X.X`
-* `git push origin release/X.X --tags`
-* create a github release off the signed tag by adding
-  * release notes from the NEWS file
-  * 3 times: tarball, asc signature and sha256sum
-10. publish and inform distributors
-* celebrate!
+* GNU / Linux - all
+* Android / Linux - all
+* FreeBSD - almost all
+* Haiku - some
+* Windows - non yet
 
-### specifications relevant to tslib
+Writing your own plugin is quite easy, in case an existing one doesn't fit.
 
-#### evdev interface read by input-raw and offered by ts_uinput
-* [Wikipedia evdev](https://en.wikipedia.org/wiki/Evdev)
-* [Linux event codes documentation](https://www.kernel.org/doc/Documentation/input/event-codes.txt)
-* [Linux event codes definitions](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/include/uapi/linux/input-event-codes.h)
+#### test program and tools
+
+* GNU / Linux - all
+* Android / Linux - all (?)
+* FreeBSD - all (?)
+* Haiku - ts_print, ts_print_raw, ts_finddev
+* Windows - ts_print.exe, ts_print_raw.exe
+
+help porting missing programs!
+
+#### libts user plugin
+This can be _any third party program_, using tslib's API. For Linux, we include
+`ts_uinput`, but Qt, X11 or anything else can use tslib's API.

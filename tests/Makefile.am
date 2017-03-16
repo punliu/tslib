@@ -13,7 +13,14 @@ AM_CPPFLAGS		= -I$(top_srcdir)/src
 
 if HAIKU
 bin_PROGRAMS		= ts_print ts_print_raw ts_finddev
-else
+endif
+if WINDOWS
+bin_PROGRAMS		= ts_print ts_print_raw
+endif
+if LINUX
+bin_PROGRAMS		= ts_test ts_test_mt ts_calibrate ts_print ts_print_mt ts_print_raw ts_harvest ts_finddev
+endif
+if FREEBSD
 bin_PROGRAMS		= ts_test ts_test_mt ts_calibrate ts_print ts_print_mt ts_print_raw ts_harvest ts_finddev
 endif
 

@@ -39,4 +39,5 @@ tools/ts_verify
 tests/ts_finddev
 tests/ts_test_mt
 compile
+*.exe
 

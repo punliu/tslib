@@ -1,4 +1,17 @@
 ## tslib development
+### reporting bugs
+When describing a problem, please always tell us the following:
+* your architecture and operating system
+* the version of tslib you are using
+* the ts.conf configuration that causes the problem for you
+
+If tslib can't use your touchscreen device, either by not starting at all or
+by behaving strangely, at least on Linux and BSD it is always helpful if you
+provide the output of the `evtest` program, selecting your original input
+device. `evtest` is most likely available as a package in your OS environment.
+You can always build it from [upstream](https://cgit.freedesktop.org/evtest)
+though.
+
 ### what to contribute
 We collect all non-trivial thoughts about improving tslib, as well as bugreports
 [in our issue tracker](https://github.com/kergoth/tslib/issues). There's a lot
@@ -43,31 +56,52 @@ or distributing tslib, make sure you comply with the licenses. And please make
 sure you have the right to the code you are contributing yourself. There is no
 other copyright aggreement. You retain your copyright to your code.
 
+### branching model
+The short version is: there really is none. But what is important is that
+our master branch is __not__ to be considered stable! A stable state will always
+be tagged (and released as tarballs).
+
+And please simply ignore the release/X.X branches! They are old.
+
+For larger features that aren't in any useful state, there are feature branches
+with random names.
+
+Smaller changes can always be done on master and therefore, the master branch
+can always be merged into feature branches, while they are in development.
+
+When a feature branch's work is stable enough, it is simply merged into master.
+We always use `git merge -no-ff`.
+
 ### release procedure
 A release can be done when either
-* an issue tagged as "improvement" is implemented, or
-* the previous release contains a user visible regression
+* the NEWS file fills up or
+* the previous release contains a visible regression
 
 The procedure looks like this:
 
-1. run coverity (or any static analysis) and fix new discovered issues
+* run coverity (or any static analysis) and fix new discovered issues
+* at least `./autogen.sh && ./configure && make` on all supported operating systems
 * be sure to have a stable build system and your private gpg key set up
 * update the NEWS file with the changelog and bugfixes
 * update the THANKS file
-* update configure.ac libts library versions
+* increment the correct version numbers in configure.ac
   * `AC_INIT` - includes the tslib package version X.X. generally we increment the minor version
   * `LT_CURRENT` - increment **only if there are API changes** (additions / removals / changes)
   * `LT_REVISION` - increment if anything changed. but if `LT_CURRENT` was incremented, set to 0!
   * `LT_AGE` - increment **only if `LT_CURRENT` was incremented** and these **API changes are backwards compatible** (should always be the case, so it should match `LT_CURRENT`)
 
-6. create a new release/X.X branch remotely and switch to it locally
-* `./release -v X.X`
-* `git push origin release/X.X --tags`
+* do __not__ commit the version change! run `./release -v X.X`
+* `git push origin master --tags`
 * create a github release off the signed tag by adding
   * release notes from the NEWS file
-  * 3 times: tarball, asc signature and sha256sum
-10. publish and inform distributors
+  * 3 times: tarball, asc signature and sha256sum files
+* publish and inform distributors
 * celebrate!
+* when the backup [gitlab repository](https://gitlab.com/tslib/tslib) pulled the release tag in (after about one day), add the tarballs and release notes there.
+
+sidenote: up until 1.7 we kept the habit of adding generated files to a release
+branch that is never used again. Those branches exist. We can't do anything
+about it. We won't create new ones anymore. Ignore them.
 
 ### specifications relevant to tslib
 
@@ -78,4 +112,24 @@ The procedure looks like this:
 
 ### project organisation for new maintainers
 
-TODO
+The tslib project currently consists of
+* the [kergoth/tslib](https://github.com/kergoth/tslib) github repository. This
+is the main upstream repository users download from. The
+maintainer of course must have access to it, at least for committing and
+creating releases. When becoming a new maintainer, ask Christopher Larson, who
+holds the "kergoth" github account, to give you access.
+* the [tslib.org](http://tslib.org) project page. It is currently registered at
+[easyname](https://www.easyname.com) and consists of one index.html and one
+css file only. They are simply hosted at easyname's included webspace.
+This project site must include links to *all parts* of the tslib project.
+That's this list right here. When becoming a new maintainer, preferrably make
+an account at easyname and the old maintainer will transfer the domain to you.
+Currently that is Martin Kepplinger. The domain is about 14 Euros per year.
+* the [tslib/tslib](https://gitlab.com/tslib/tslib) gitlab repository. This
+is currently simply a backup that pulls in every changes from github once a
+day. We want to have it in case github is down. Although it'd be easy to
+move development over to gitlab, it's not easy to have distributors and users
+follow you. So this is currently a backup only. Martin Kepplinger currently
+holds the "tslib" gitlab user-account and will hand it over to the new
+maintainer.
+* (not yet) a mainling list. As soon as set up, it must be documented here.

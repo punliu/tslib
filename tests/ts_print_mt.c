@@ -27,7 +27,7 @@
 #include "tslib.h"
 #include "testutils.h"
 
-void usage(char **argv)
+static void usage(char **argv)
 {
 	printf("Usage: %s [--raw] [--non-blocking] [-s samples] [-i <device>]\n", argv[0]);
 }
@@ -46,11 +46,11 @@ int main(int argc, char **argv)
 
 	while (1) {
 		const struct option long_options[] = {
-			{ "help",         no_argument,       0, 'h' },
-			{ "idev",         required_argument, 0, 'i' },
-			{ "samples",      required_argument, 0, 's' },
-			{ "non-blocking", no_argument,       0, 'n' },
-			{ "raw",          no_argument,       0, 'r' },
+			{ "help",         no_argument,       NULL, 'h' },
+			{ "idev",         required_argument, NULL, 'i' },
+			{ "samples",      required_argument, NULL, 's' },
+			{ "non-blocking", no_argument,       NULL, 'n' },
+			{ "raw",          no_argument,       NULL, 'r' },
 		};
 
 		int option_index = 0;
@@ -146,17 +146,13 @@ int main(int argc, char **argv)
 			exit(1);
 		}
 
-		if (ret != read_samples) {
-			printf("ts_print_mt: read less samples than requested\n");
-			continue;
-		}
-
 		for (j = 0; j < ret; j++) {
 			for (i = 0; i < max_slots; i++) {
 				if (samp_mt[j][i].valid != 1)
 					continue;
 
-				printf(YELLOW "%ld.%06ld:" RESET " (slot %d) %6d %6d %6d\n",
+				printf(YELLOW "sample %d - %ld.%06ld -" RESET " (slot %d) %6d %6d %6d\n",
+				       j,
 				       samp_mt[j][i].tv.tv_sec,
 				       samp_mt[j][i].tv.tv_usec,
 				       samp_mt[j][i].slot,

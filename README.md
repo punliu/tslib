@@ -60,7 +60,8 @@ by any combination of filter modules.
     module dejitter delta=100
     module linear
 
-see the [below](#filter-modules) for available filters and their parameters.
+see the [section below](#filter-modules) for available filters and their
+parameters.
 
 With this configuration file, we end up with the following data flow
 through the library:
@@ -85,8 +86,9 @@ filters, using `ts_test_mt`:
     # ts_test_mt
 
 ### use the filtered result in your system
-One way to provide your resulting input behaviour to your system, is to use
-tslib's userspace input driver `ts_uinput`:
+You need a tool using tslib'd API and provide it to your input system. There are
+various ways to do so on various systems. We only describe one way for Linux
+here - using tslib's included userspace input evdev driver `ts_uinput`:
 
     # ts_uinput -d
 
@@ -94,6 +96,19 @@ tslib's userspace input driver `ts_uinput`:
 `/dev/input/` there now is a new input event device, which provides your
 configured input. You can even use a script like `tools/ts_uinput_start.sh` to
 start the ts_uinput daemon and create a defined `/dev/input/ts_uinput` symlink.
+
+In this case, for Qt5 for example you'd probably set something like this:
+
+    QT_QPA_GENERIC_PLUGINS=evdevtouch:/dev/input/ts_uinput
+    QT_QPA_EVDEV_TOUCHSCREEN_PARAMETERS=/dev/input/ts_uinput:rotate=0
+
+For X11 you'd probably edit your `xorg.conf` `Section "InputDevice"` for your
+touchscreen to have
+
+    Option "Device" "/dev/input/ts_uinput"
+
+and so on. Please see your system's documentation on how to use a specific
+evdev input device.
 
 Remember to set your environment and configuration for ts_uinput, just like you
 did for ts_calibrate or ts_test_mt.
@@ -106,38 +121,57 @@ Let's recap the data flow here:
 
 ## filter modules
 
-### module:	variance
+### module: linear
 
 #### Description:
-  Variance filter. Tries to do it's best in order to filter out random noise
-  coming from touchscreen ADC's. This is achieved by limiting the sample
-  movement speed to some value (e.g. the pen is not supposed to move quicker
-  than some threshold).
-
-  This is a 'greedy' filter, e.g. it gives less samples on output than
-  receives on input. It can cause problems on capacitive touchscreens that
-  already apply such a filter.
-
-  There is **no** multitouch support for this filter (yet). `ts_read_mt()` will
-  only read one slot, when this filter is used. You can try using the median
-  filter instead.
+  Linear scaling - calibration - module, primerily used for conversion of touch
+  screen co-ordinates to screen co-ordinates. It applies the corrections as
+  recorded and saved by the `ts_calibrate` tool. It's the only module that reads
+  a configuration file.
 
 #### Parameters:
-* `delta`
+* `xyswap`
 
-	Set the squared distance in touchscreen units between previous and
-	current pen position (e.g. (X2-X1)^2 + (Y2-Y1)^2). This defines the
-	criteria for determining whenever two samples are 'near' or 'far'
-	to each other.
+	interchange the X and Y co-ordinates -- no longer used or needed
+	if the linear calibration utility `ts_calibrate` is used.
 
-	Now if the distance between previous and current sample is 'far',
-	the sample is marked as 'potential noise'. This doesn't mean yet
-	that it will be discarded; if the next reading will be close to it,
-	this will be considered just a regular 'quick motion' event, and it
-	will sneak to the next layer. Also, if the sample after the
-	'potential noise' is 'far' from both previously discussed samples,
-	this is also considered a 'quick motion' event and the sample sneaks
-	into the output stream.
+* `pressure_offset`
+
+	offset applied to the pressure value
+* `pressure_mul`
+
+	factor to multiply the pressure value with
+* `pressure_div`
+
+	value to divide the pressure value by
+
+
+### module: median
+
+#### Description:
+  Similar to what a variance filter does, the median filter suppresses
+  spikes in the gesture. For some theory, see [Wikipedia](https://en.wikipedia.org/wiki/Median_filter)
+
+Parameters:
+* `depth`
+
+	Number of samples to apply the median filter to
+
+
+### module: pthres
+
+#### Description:
+  Pressure threshold filter. Given a release is always pressure 0 and a
+  press is always >= 1, this discards samples below / above the specified
+  pressure threshold.
+
+#### Parameters:
+* `pmin`
+
+	Minimum pressure value for a sample to be valid.
+* `pmax`
+
+	Maximum pressure value for a sample to be valid.
 
 
 ### module: dejitter
@@ -157,46 +191,6 @@ Let's recap the data flow here:
 	is not feasible to smooth pen motion, besides quick motion is not
 	precise anyway; so if quick motion is detected the module just
 	discards the backlog and simply copies input to output.
-
-
-### module: linear
-
-#### Description:
-  Linear scaling module, primerily used for conversion of touch screen
-  co-ordinates to screen co-ordinates. It applies the corrections as recorded
-  and saved by the `ts_calibrate` tool.
-
-#### Parameters:
-* `xyswap`
-
-	interchange the X and Y co-ordinates -- no longer used or needed
-	if the linear calibration utility `ts_calibrate` is used.
-
-* `pressure_offset`
-
-	offset applied to the pressure value
-* `pressure_mul`
-
-	factor to multiply the pressure value with
-* `pressure_div`
-
-	value to divide the pressure value by
-
-
-### module: pthres
-
-#### Description:
-  Pressure threshold filter. Given a release is always pressure 0 and a
-  press is always >= 1, this discards samples below / above the specified
-  pressure threshold.
-
-#### Parameters:
-* `pmin`
-
-	Minimum pressure value for a sample to be valid.
-* `pmax`
-
-	Maximum pressure value for a sample to be valid.
 
 
 ### module: debounce
@@ -219,6 +213,8 @@ Let's recap the data flow here:
   Skip nhead samples after press and ntail samples before release. This
   should help if for the device the first or last samples are unreliable.
 
+  Note that it is still **experimental for multitouch**.
+
 Parameters:
 * `nhead`
 
@@ -228,16 +224,39 @@ Parameters:
 	Number of events to drop before release
 
 
-### module: median
+### module:	variance
 
 #### Description:
-  Similar to what the variance filter does, the median filter suppresses
-  spikes in the gesture. For some theory, see [Wikipedia](https://en.wikipedia.org/wiki/Median_filter)
+  Variance filter. Tries to do it's best in order to filter out random noise
+  coming from touchscreen ADC's. This is achieved by limiting the sample
+  movement speed to some value (e.g. the pen is not supposed to move quicker
+  than some threshold).
 
-Parameters:
-* `depth`
+  This is a 'greedy' filter, e.g. it gives less samples on output than
+  receives on input. It can cause problems on capacitive touchscreens that
+  already apply such a filter.
 
-	Number of samples to apply the median filter to
+  There is **no multitouch** support for this filter (yet). `ts_read_mt()` will
+  only read one slot when this filter is used. You can try using the median
+  filter instead.
+
+#### Parameters:
+* `delta`
+
+	Set the squared distance in touchscreen units between previous and
+	current pen position (e.g. (X2-X1)^2 + (Y2-Y1)^2). This defines the
+	criteria for determining whenever two samples are 'near' or 'far'
+	to each other.
+
+	Now if the distance between previous and current sample is 'far',
+	the sample is marked as 'potential noise'. This doesn't mean yet
+	that it will be discarded; if the next reading will be close to it,
+	this will be considered just a regular 'quick motion' event, and it
+	will sneak to the next layer. Also, if the sample after the
+	'potential noise' is 'far' from both previously discussed samples,
+	this is also considered a 'quick motion' event and the sample sneaks
+	into the output stream.
+
 
 
 ***
@@ -245,8 +264,7 @@ Parameters:
 
 ## the libts library
 ### the libts API
-Check out the [tests](https://github.com/kergoth/tslib/tree/master/tests)
-directory for examples how to use it.
+Check out our tests directory for examples how to use it.
 
 `ts_open()`  
 `ts_config()`  
@@ -261,7 +279,7 @@ directory for examples how to use it.
 `ts_read_mt()`  
 `ts_reat_raw_mt()`  
 
-The API is documented in [our man pages](https://github.com/kergoth/tslib/tree/master/doc).
+The API is documented in our man pages in the doc directory.
 Possibly there will be distributors who provide them online, like
 [Debian had done for tslib-1.0](https://manpages.debian.org/wheezy/libts-bin/index.html).
 As soon as there are up-to-date html pages hosted somewhere, we'll link the
@@ -305,7 +323,7 @@ backwards compatibility.
 
 ### libts users
 
-* [ts_uinput](https://github.com/kergoth/tslib/blob/master/tools/ts_uinput.c) - userspace event device driver for the tslib-filtered samples
+* ts_uinput - userspace event device driver for the tslib-filtered samples. part of tslib (tools/ts_uinput.c)
 * [xf86-input-tslib](http://public.pengutronix.de/software/xf86-input-tslib/) - **outdated** direct tslib input plugin for X
 * [qtslib](https://github.com/qt/qtbase/tree/dev/src/platformsupport/input/tslib) - **outdated** Qt5 qtbase tslib plugin
 
@@ -451,8 +469,8 @@ _shared libraries_, build on the following operating systems.
 #### input plugins (`module_raw`)
 
 This makes the thing usable in the read world because it accesses your device.
-See the [configure.ac](https://github.com/kergoth/tslib/blob/master/configure.ac)
-file for the currently possible configuration for your platform.
+See our configure.ac file for the currently possible configuration for your
+platform.
 
 * GNU / Linux - all
 * Android / Linux - all
